@@ -1,0 +1,10 @@
+# Recorded 24h history: machine-local runtime state, and it holds a record of a
+# real cluster's utilisation. Regenerated on first run.
+state/
+
+# No dependencies, but keep these out if one is ever added.
+node_modules/
+npm-debug.log*
+
+# macOS
+.DS_Store

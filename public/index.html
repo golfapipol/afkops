@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>k8s-farm</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  @font-face {
+    font-family: 'PixelFont';
+    src: url('assets/PressStart2P.woff2') format('woff2');
+    font-display: block;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #05060a; color: #cdd6f4;
+    font-family: 'PixelFont', ui-monospace, monospace;
+  }
+  /* A wallboard should not show a stray pointer all day, but it still has to be
+     usable: the cursor hides only after the mouse has been still for a while. */
+  body.idle, body.idle #stage { cursor: none; }
+  #stage { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; cursor: crosshair; }
+  #boot {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    font-size: 10px; color: #7f849c; letter-spacing: 1px; background: #05060a;
+    transition: opacity .4s; z-index: 10;
+  }
+  #boot.gone { opacity: 0; pointer-events: none; }
+  #hint {
+    position: fixed; bottom: 6px; right: 8px; font-size: 7px; color: #45475a;
+    opacity: 0; transition: opacity .25s; z-index: 5; pointer-events: none;
+  }
+  body:hover #hint { opacity: 1; }
+</style>
+</head>
+<body>
+  <canvas id="stage"></canvas>
+  <div id="boot">LOADING FARM<span id="dots"></span></div>
+  <div id="hint">N NEXT PROBLEM &nbsp; WASD MOVE &nbsp; +/- ZOOM &nbsp; F FIT &nbsp; 1/2/3 SKIN &nbsp; V VIEW &nbsp; G GRAPHICS &nbsp; L LEGEND</div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "port": 8787,
+  "namespaces": {
+    "include": [],
+    "exclude": [],
+    "dim": ["kube-system", "kube-public", "kube-node-lease", "gke-managed-system", "gmp-system"]
+  },
+  "resyncMs": 300000,
+  "metricsMs": 30000,
+  "primingMs": 4000,
+  "snapshotMs": 2000,
+  "historySaveMs": 300000,
+  "defaultSkin": "farm",
+  "autoRotateSkinMs": 0,
+  "nightlyReloadHour": 4
+}

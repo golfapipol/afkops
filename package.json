@@ -1,0 +1,15 @@
+{
+  "name": "k8s-farm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "8-bit AFK-sim wallboard for Kubernetes node capacity and pod allocation",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "demo": "node server/index.js --demo",
+    "wall": "caffeinate -d node server/index.js --open",
+    "wall-demo": "caffeinate -d node server/index.js --demo --open",
+    "test": "node --test 'test/*.test.js' 'test/*.test.mjs'"
+  },
+  "engines": { "node": ">=18" }
+}
