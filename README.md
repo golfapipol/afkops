@@ -13,6 +13,12 @@ npx afkops --wall     # 24/7 board: keeps the display awake
 It opens <http://localhost:8787> itself. Press **F11** for fullscreen, **`?`** for
 the legend. Read-only — it never changes anything in your cluster.
 
+![afkops demo](https://raw.githubusercontent.com/golfapipol/afkops/main/docs/demo.gif)
+
+*Zooming in, switching to the side-on view, then the factory and dungeon skins,
+and finally pressing `N` to jump to a problem — a pod in `CrashLoopBackOff` using
+40% of the CPU it reserved. All from the built-in synthetic cluster.*
+
 ![Farm skin, top-down](https://raw.githubusercontent.com/golfapipol/afkops/main/docs/farm-topdown.png)
 
 *Twelve nodes at true scale: `kube-system-pool` has 16 cores so its plot is
@@ -334,12 +340,19 @@ reasons worth animating.
 git clone https://github.com/golfapipol/afkops && cd afkops
 npm test             # 53 tests, no install step
 npm run shots        # regenerates docs/*.png from the demo cluster
+npm run record       # regenerates docs/demo.gif and docs/demo.mp4
 ```
 
 Always captured from `--demo`, never from a real cluster. The board is a picture
 of whatever it is pointed at, so a screenshot of a live cluster publishes its
 node pools, namespaces and workload names — using the synthetic cluster keeps
 that out of the repo by construction.
+
+`record` drives the same headless browser through a scripted timeline of real key
+events (`Input.dispatchKeyEvent`, not internal calls, so the recording exercises
+the path a person would), captures frames at a fixed wall-clock cadence so that
+playback is real time, and encodes with nearest-neighbour scaling and no
+dithering — dithering a pixel-art source is what makes GIFs of it look muddy.
 
 The capture drives headless Chrome over the DevTools Protocol rather than using
 Chrome's `--screenshot` flag: the board animates continuously, so it never

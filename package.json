@@ -29,6 +29,7 @@
     "real": "node bin/afkops.js --real --no-open",
     "wall": "node bin/afkops.js --wall",
     "shots": "node scripts/shoot.mjs",
+    "record": "node scripts/record.mjs",
     "test": "node --test"
   },
   "engines": { "node": ">=18" },
