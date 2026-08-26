@@ -8,3 +8,6 @@ npm-debug.log*
 
 # macOS
 .DS_Store
+
+# npm pack output
+*.tgz

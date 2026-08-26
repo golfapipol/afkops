@@ -1,0 +1,4 @@
+{
+  "//": "The browser modules are ES modules. The root package is commonjs (the server), so this marks public/ explicitly rather than relying on Node's syntax auto-detection, which only exists on newer Node and is what the .mjs tests need to import these files.",
+  "type": "module"
+}

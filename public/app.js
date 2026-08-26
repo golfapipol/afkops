@@ -112,7 +112,7 @@ let viewId = stored('k8sfarm.view', 'topdown', VIEWS, 'view');
 function renderNow() {
   if (!world) return;
   try { drawScene(performance.now(), 16); engine.present(); }
-  catch (e) { drawErrors++; console.warn('[k8s-farm] draw error:', e); }
+  catch (e) { drawErrors++; console.warn('[afkops] draw error:', e); }
 }
 
 function applyTier() {
@@ -477,7 +477,7 @@ function frame(now) {
     drawErrors++;
     if (now - lastDrawErrorLog > 5000) {
       lastDrawErrorLog = now;
-      console.error(`[k8s-farm] draw error (${drawErrors} so far):`, e);
+      console.error(`[afkops] draw error (${drawErrors} so far):`, e);
     }
   }
   requestAnimationFrame(frame);

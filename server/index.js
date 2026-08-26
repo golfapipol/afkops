@@ -17,7 +17,7 @@ const arg = (k, d) => { const a = argv.find((x) => x.startsWith(`--${k}=`)); ret
 
 let config = { port: 8787, namespaces: { include: [], exclude: [], dim: [] } };
 try { config = { ...config, ...JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8')) }; }
-catch (e) { console.warn('[k8s-farm] using defaults, config.json unreadable:', e.message); }
+catch (e) { console.warn('[afkops] using defaults, config.json unreadable:', e.message); }
 const PORT = Number(arg('port', process.env.PORT || config.port)) || 8787;
 config.clockSpeed = Number(arg('clock-speed', 1)) || 1;
 config.demoBeatMs = Number(arg('beat', config.demoBeatMs || 2600));
@@ -25,10 +25,26 @@ config.demoNodes = Number(arg('nodes', config.demoNodes || 6));
 config.demoPods = Number(arg('pods', config.demoPods || 34));
 
 // A 24/7 wallboard must never die from one bad frame. Log and carry on.
-process.on('uncaughtException', (e) => console.error('[k8s-farm] uncaught:', e && e.stack || e));
-process.on('unhandledRejection', (e) => console.error('[k8s-farm] unhandled:', e && e.stack || e));
+process.on('uncaughtException', (e) => console.error('[afkops] uncaught:', e && e.stack || e));
+process.on('unhandledRejection', (e) => console.error('[afkops] unhandled:', e && e.stack || e));
 
-const history = createHistory(path.join(ROOT, 'state', 'history.json'));
+// Where the 24h history lives. Installed under node_modules the package
+// directory is often read-only and is never the right place for user data, so
+// fall back to the user's home directory.
+function stateDir() {
+  if (process.env.AFKOPS_STATE) return process.env.AFKOPS_STATE;
+  const local = path.join(ROOT, 'state');
+  try {
+    fs.mkdirSync(local, { recursive: true });
+    fs.accessSync(local, fs.constants.W_OK);
+    return local;
+  } catch {}
+  const home = path.join(require('node:os').homedir(), '.afkops');
+  try { fs.mkdirSync(home, { recursive: true }); } catch {}
+  return home;
+}
+
+const history = createHistory(path.join(stateDir(), 'history.json'));
 history.load();
 // Demo mode starts with a plausible day already on the ribbon, so the 24h view
 // is visible immediately instead of after a full day of real samples.
@@ -73,7 +89,7 @@ const collector = (DEMO ? createDemoCollector : createCollector)({
   config,
   onTransition: queueTransition,
   onLinkChange: (link) => {
-    console.log(`[k8s-farm] link ${link.ok ? 'UP' : 'DOWN'}${link.error ? ': ' + link.error : ''}`);
+    console.log(`[afkops] link ${link.ok ? 'UP' : 'DOWN'}${link.error ? ': ' + link.error : ''}`);
     broadcast('link', link);
   },
 });
@@ -90,7 +106,7 @@ function tickSnapshot() {
     history.sample(Date.now(), { cpuFrac, memFrac, useFrac });
     broadcast('state', w);
   } catch (e) {
-    console.error('[k8s-farm] snapshot failed:', e.message);
+    console.error('[afkops] snapshot failed:', e.message);
   }
 }
 
@@ -183,8 +199,17 @@ const saveTimer = setInterval(() => { if (!SEEDED) history.save(); }, config.his
 if (snapTimer.unref) snapTimer.unref();
 if (saveTimer.unref) saveTimer.unref();
 
+// Best effort, and silent on failure: not opening a browser is a small loss,
+// crashing the board over it would not be.
+function openBrowser(url) {
+  const cmd = process.platform === 'darwin' ? 'open'
+            : process.platform === 'win32' ? 'cmd' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  try { spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref(); } catch {}
+}
+
 function shutdown(sig) {
-  console.log(`\n[k8s-farm] ${sig}, saving history and stopping`);
+  console.log(`\n[afkops] ${sig}, saving history and stopping`);
   if (!SEEDED) history.save();
   try { collector.stop(); } catch {}
   clearInterval(hb); clearInterval(snapTimer); clearInterval(saveTimer);
@@ -197,10 +222,10 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Real mode only: the demo needs no cluster and no kubectl.
 const checked = DEMO ? Promise.resolve() : require('./kubectl.js').preflight().then((r) => {
-  if (r.version) console.log(`[k8s-farm] kubectl ${r.version}`);
-  for (const p of r.problems) console.error(`[k8s-farm] REQUIREMENT: ${p}`);
+  if (r.version) console.log(`[afkops] kubectl ${r.version}`);
+  for (const p of r.problems) console.error(`[afkops] REQUIREMENT: ${p}`);
   if (r.problems.length) {
-    console.error('[k8s-farm] see the Requirements section of the README');
+    console.error('[afkops] see the Requirements section of the README');
     process.exit(1);
   }
 }).catch(() => {});
@@ -209,8 +234,23 @@ checked.then(() => collector.start()).then(() => {
   tickSnapshot();
   server.listen(PORT, '127.0.0.1', () => {
     const url = `http://localhost:${PORT}`;
-    console.log(`[k8s-farm] ${DEMO ? 'DEMO cluster' : 'watching kubectl current-context'}`);
-    console.log(`[k8s-farm] wallboard on ${url}  (fullscreen with F11)`);
-    if (OPEN) { try { spawn('open', [url], { detached: true, stdio: 'ignore' }).unref(); } catch {} }
+    if (DEMO) {
+      // Built from the content so the box always lines up, whatever the text.
+      const lines = [
+        'DEMO MODE — this cluster is SYNTHETIC.',
+        'Nothing here comes from a real cluster.',
+        "Run with --real to watch kubectl's current-context.",
+      ];
+      const w = Math.max(...lines.map((l) => [...l].length)) + 4;
+      console.log('');
+      console.log('  ┌' + '─'.repeat(w) + '┐');
+      for (const l of lines) console.log('  │  ' + l + ' '.repeat(w - [...l].length - 2) + '│');
+      console.log('  └' + '─'.repeat(w) + '┘');
+      console.log('');
+    } else {
+      console.log('[afkops] watching kubectl current-context (read-only)');
+    }
+    console.log(`[afkops] board on ${url}  (fullscreen with F11, ? for the legend)`);
+    if (OPEN) openBrowser(url);
   });
-}).catch((e) => { console.error('[k8s-farm] failed to start collector:', e); process.exit(1); });
+}).catch((e) => { console.error('[afkops] failed to start collector:', e); process.exit(1); });

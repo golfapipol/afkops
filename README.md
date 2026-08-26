@@ -1,18 +1,19 @@
-# k8s-farm
+# afkops
 
-An 8-bit AFK-simulation wallboard for Kubernetes node capacity and pod allocation.
-Nodes are plots of land, pods are the things living on them, and the whole cluster
-runs as an idle game you can leave on a screen for a day.
+**Your Kubernetes cluster as an idle game.** A pixel-art wallboard for node
+capacity, pod allocation and live usage — every pod is a creature going about its
+business, and you can leave it on a screen for a day.
 
 ```bash
-npm run demo          # synthetic cluster, no credentials needed
-npm start             # watches kubectl's current-context
-npm run wall          # 24/7 mode: keeps the display awake, opens the browser
+npx afkops            # a synthetic cluster — no credentials, nothing to install
+npx afkops --real     # watch kubectl's current-context
+npx afkops --wall     # 24/7 board: keeps the display awake
 ```
 
-Then open <http://localhost:8787> and press **F11** for fullscreen.
+It opens <http://localhost:8787> itself. Press **F11** for fullscreen, **`?`** for
+the legend. Read-only — it never changes anything in your cluster.
 
-![Farm skin, top-down](docs/farm-topdown.png)
+![Farm skin, top-down](https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/farm-topdown.png)
 
 *Twelve nodes at true scale: `kube-system-pool` has 16 cores so its plot is
 genuinely eight times the width of the 2-core pools above it. Green rows are CPU
@@ -22,26 +23,26 @@ and the sidebar ranks what needs attention.*
 
 <table>
 <tr>
-<td width="50%"><img src="docs/truescale.png" alt="Zoomed in"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/truescale.png" alt="Zoomed in"><br>
 <sub><b>Zoomed to 100%</b> — one sprite per pod. Sheep, cows and chickens are
 CPU request tiers; a cordoned node reads <code>CLOSED</code>. The minimap shows
 how much cluster is off-screen.</sub></td>
-<td width="50%"><img src="docs/farm-sideon.png" alt="Side-on view"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/farm-sideon.png" alt="Side-on view"><br>
 <sub><b>Side-on view</b> (<code>V</code>) — the same data as a building. Floor
 width is still capacity, so the floors are comparable down the stack.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/factory-night.png" alt="Factory skin at night"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/factory-night.png" alt="Factory skin at night"><br>
 <sub><b>Factory skin at night</b> — same cluster, industrial vocabulary
 (<code>POWER</code>, <code>STORAGE</code>, machines on floors). The palette
 follows the real clock.</sub></td>
-<td width="50%"><img src="docs/dungeon-topdown.png" alt="Dungeon skin"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/dungeon-topdown.png" alt="Dungeon skin"><br>
 <sub><b>Dungeon skin</b> — rooms and a party, torch-lit. Pod tiers become
 <code>IMP</code>/<code>ROGUE</code>/<code>KNIGHT</code>/<code>GIANT</code>.</sub></td>
 </tr>
 </table>
 
-![8-bit tier](docs/farm-8bit.png)
+![8-bit tier](https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/farm-8bit.png)
 
 *The same board in the **8-bit** tier (`G`): a fixed 640×360 buffer, integer-upscaled
 and letterboxed, with flat colour and dithered shading instead of gradients.*
@@ -260,9 +261,9 @@ The palette follows your actual wall clock through dawn, day, dusk and night.
 | **Browser** | Chromium / Firefox / Safari from ~2020 | Canvas 2D with `CanvasPattern.setTransform`. |
 | **Auth plugin** | `gke-gcloud-auth-plugin` (GKE) or `aws-iam-authenticator` (EKS) | Whatever your kubectl already needs. kubectl does the authenticating, which is the reason it is the transport. |
 
-`npm run wall` uses **`caffeinate`** (macOS) to stop the display sleeping. On
-Linux use `systemd-inhibit --what=idle node server/index.js`, or just run
-`npm start` and disable the screensaver.
+`npx afkops --wall` asks the OS not to sleep the display — `caffeinate` on macOS,
+`systemd-inhibit` on Linux. Both are optional: if neither is present the board
+still runs, it just won't stop a screensaver.
 
 ### Cluster permissions
 
@@ -280,8 +281,8 @@ rules:
 
 ### Nothing to install
 
-There are no dependencies to fetch — `npm install` has nothing to do. Clone it
-and run `npm run demo`.
+Zero npm dependencies, so `npx afkops` fetches ~90 kB and nothing else. Clone the
+repo instead if you want to hack on it — there is still nothing to install.
 
 ## Configuration
 
@@ -330,6 +331,8 @@ reasons worth animating.
 ### Screenshots
 
 ```bash
+git clone https://github.com/golfapipol/k8s-farm-simulation && cd k8s-farm-simulation
+npm test             # 53 tests, no install step
 npm run shots        # regenerates docs/*.png from the demo cluster
 ```
 
@@ -358,11 +361,10 @@ A parameter beats a stored preference, and both beat `defaultSkin` in
 `config.json`.
 
 ```bash
-npm test                                     # 53 tests
-npm run demo -- --seed-history               # pre-fill the 24h ribbon
-npm run demo -- --nodes=12 --pods=250        # size the synthetic cluster
-npm run demo -- --clock-speed=400            # sweep a whole day in ~4 minutes
-npm run demo -- --beat=200                   # heavy churn, for soak testing
+npx afkops --seed-history               # pre-fill the 24h ribbon
+npx afkops --nodes=12 --pods=250        # size the synthetic cluster
+npx afkops --clock-speed=400            # sweep a whole day in ~4 minutes
+npx afkops --beat=200                   # heavy churn, for soak testing
 ```
 
 Zero npm dependencies; `kubectl` is the transport, which is what makes the GKE

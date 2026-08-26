@@ -1,16 +1,36 @@
 {
-  "name": "k8s-farm",
-  "version": "1.0.0",
-  "private": true,
-  "description": "8-bit AFK-sim wallboard for Kubernetes node capacity and pod allocation",
+  "name": "afkops",
+  "version": "0.1.0",
+  "description": "Your Kubernetes cluster as an idle game: a pixel-art wallboard for node capacity, pod allocation and live usage",
+  "keywords": [
+    "kubernetes", "k8s", "dashboard", "wallboard", "monitoring",
+    "capacity", "allocation", "requests", "limits", "metrics",
+    "kubectl", "cli", "pixel-art", "idle-game", "tui"
+  ],
+  "license": "MIT",
+  "author": "golfapipol (https://github.com/golfapipol)",
+  "homepage": "https://github.com/golfapipol/k8s-farm-simulation#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/golfapipol/k8s-farm-simulation.git" },
+  "bugs": { "url": "https://github.com/golfapipol/k8s-farm-simulation/issues" },
+  "type": "commonjs",
+  "bin": { "afkops": "bin/afkops.js" },
   "main": "server/index.js",
+  "files": [
+    "bin/",
+    "server/",
+    "public/",
+    "config.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "start": "node server/index.js",
-    "demo": "node server/index.js --demo",
-    "wall": "caffeinate -d node server/index.js --open",
-    "wall-demo": "caffeinate -d node server/index.js --demo --open",
+    "start": "node bin/afkops.js",
+    "demo": "node bin/afkops.js --no-open",
+    "real": "node bin/afkops.js --real --no-open",
+    "wall": "node bin/afkops.js --wall",
     "shots": "node scripts/shoot.mjs",
     "test": "node --test"
   },
-  "engines": { "node": ">=18" }
+  "engines": { "node": ">=18" },
+  "os": ["darwin", "linux", "win32"]
 }
