@@ -12,6 +12,43 @@ npm run wall          # 24/7 mode: keeps the display awake, opens the browser
 
 Then open <http://localhost:8787> and press **F11** for fullscreen.
 
+![Farm skin, top-down](docs/farm-topdown.png)
+
+*Twelve nodes at true scale: `kube-system-pool` has 16 cores so its plot is
+genuinely eight times the width of the 2-core pools above it. Green rows are CPU
+actually in use, bare soil is reserved-but-idle, and the fence is where the
+requests run out. One node is down (red, raining), four pods have nowhere to go,
+and the sidebar ranks what needs attention.*
+
+<table>
+<tr>
+<td width="50%"><img src="docs/truescale.png" alt="Zoomed in"><br>
+<sub><b>Zoomed to 100%</b> — one sprite per pod. Sheep, cows and chickens are
+CPU request tiers; a cordoned node reads <code>CLOSED</code>. The minimap shows
+how much cluster is off-screen.</sub></td>
+<td width="50%"><img src="docs/farm-sideon.png" alt="Side-on view"><br>
+<sub><b>Side-on view</b> (<code>V</code>) — the same data as a building. Floor
+width is still capacity, so the floors are comparable down the stack.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/factory-night.png" alt="Factory skin at night"><br>
+<sub><b>Factory skin at night</b> — same cluster, industrial vocabulary
+(<code>POWER</code>, <code>STORAGE</code>, machines on floors). The palette
+follows the real clock.</sub></td>
+<td width="50%"><img src="docs/dungeon-topdown.png" alt="Dungeon skin"><br>
+<sub><b>Dungeon skin</b> — rooms and a party, torch-lit. Pod tiers become
+<code>IMP</code>/<code>ROGUE</code>/<code>KNIGHT</code>/<code>GIANT</code>.</sub></td>
+</tr>
+</table>
+
+![8-bit tier](docs/farm-8bit.png)
+
+*The same board in the **8-bit** tier (`G`): a fixed 640×360 buffer, integer-upscaled
+and letterboxed, with flat colour and dithered shading instead of gradients.*
+
+All screenshots are of the **synthetic demo cluster** — see
+[Screenshots](#screenshots) for why, and how to regenerate them.
+
 | key | action |
 |---|---|
 | `1` `2` `3` | Farm / Factory / Dungeon skin |
@@ -212,6 +249,40 @@ red ticks are incidents.
 
 The palette follows your actual wall clock through dawn, day, dusk and night.
 
+## Requirements
+
+| | Needs | Why |
+|---|---|---|
+| **kubectl** | **1.20 or newer**, on `PATH` | The board reads state from `kubectl get --watch --output-watch-events`, which arrived in 1.20. Checked at startup: an older kubectl is reported and refused rather than producing a board that silently never fills. |
+| **Node.js** | **18 or newer** | Server uses only `node:` built-ins — no npm dependencies. `node --test` needs 18. |
+| **Cluster** | any Kubernetes reachable by your kubectl | Verified against GKE 1.35. Read-only throughout. |
+| **metrics-server** | optional | Supplies the *usage* layer. Without it capacity and allocation still render and the usage channel simply goes dark. Preinstalled on GKE, EKS and AKS. |
+| **Browser** | Chromium / Firefox / Safari from ~2020 | Canvas 2D with `CanvasPattern.setTransform`. |
+| **Auth plugin** | `gke-gcloud-auth-plugin` (GKE) or `aws-iam-authenticator` (EKS) | Whatever your kubectl already needs. kubectl does the authenticating, which is the reason it is the transport. |
+
+`npm run wall` uses **`caffeinate`** (macOS) to stop the display sleeping. On
+Linux use `systemd-inhibit --what=idle node server/index.js`, or just run
+`npm start` and disable the screensaver.
+
+### Cluster permissions
+
+Read-only. The board never mutates anything:
+
+```yaml
+rules:
+  - apiGroups: [""]
+    resources: [nodes, pods, events]
+    verbs: [get, list, watch]
+  - apiGroups: ["metrics.k8s.io"]        # optional: the usage layer
+    resources: [nodes, pods]
+    verbs: [get, list]
+```
+
+### Nothing to install
+
+There are no dependencies to fetch — `npm install` has nothing to do. Clone it
+and run `npm run demo`.
+
 ## Configuration
 
 `config.json`:
@@ -256,9 +327,40 @@ reasons worth animating.
 
 ## Development
 
+### Screenshots
+
+```bash
+npm run shots        # regenerates docs/*.png from the demo cluster
+```
+
+Always captured from `--demo`, never from a real cluster. The board is a picture
+of whatever it is pointed at, so a screenshot of a live cluster publishes its
+node pools, namespaces and workload names — using the synthetic cluster keeps
+that out of the repo by construction.
+
+The capture drives headless Chrome over the DevTools Protocol rather than using
+Chrome's `--screenshot` flag: the board animates continuously, so it never
+reports "idle" and the flag hangs. CDP also lets the capture wait for sprites to
+finish walking to their places, and it refuses to save a shot if the page logged
+any draw errors.
+
+### Deep links
+
+Board state can be set by query parameter, which is how the screenshots are
+scripted and how you would point two kiosks at different views:
+
+```
+?skin=farm|factory|dungeon &view=topdown|sideon &tier=8bit|64bit
+&zoom=fit|<number>         &hour=0-23        # pins the day/night palette
+```
+
+A parameter beats a stored preference, and both beat `defaultSkin` in
+`config.json`.
+
 ```bash
 npm test                                     # 53 tests
 npm run demo -- --seed-history               # pre-fill the 24h ribbon
+npm run demo -- --nodes=12 --pods=250        # size the synthetic cluster
 npm run demo -- --clock-speed=400            # sweep a whole day in ~4 minutes
 npm run demo -- --beat=200                   # heavy churn, for soak testing
 ```

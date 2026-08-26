@@ -162,7 +162,7 @@ export function drawContainer(g, node, r, ctx) {
 
 // The server already reduced the node name to its meaningful pool part.
 function shortName(node) {
-  return String((node && node.display) || (node && node.name) || node || '').slice(0, 15);
+  return String((node && node.display) || (node && node.name) || node || '').slice(0, 24);
 }
 
 export function drawUnit(g, u, ctx) {

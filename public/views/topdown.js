@@ -26,7 +26,24 @@ export function computeLayout(nodes, bounds) {
   const n = nodes.length;
   if (!n) return { items: [], world: { w: bounds.w, h: bounds.h } };
 
-  const rowWidth = Math.max(bounds.w, MIN_NODE_W * 3);
+  // Row width is chosen from the content, not fixed to the viewport. A single
+  // 16-core node is ~500 units wide -- wider than the viewport -- so a fixed row
+  // gives every large node a row of its own and the world becomes a tall ribbon
+  // that fits badly at any zoom. Aim instead for a world with roughly the
+  // viewport's proportions, and never narrower than the widest node.
+  let widest = 0, totalW = 0;
+  for (const node of nodes) {
+    const w = Math.max(MIN_NODE_W, (node.cpu.allocatable || 0) * PX_PER_CORE);
+    widest = Math.max(widest, w);
+    totalW += w + GAP;
+  }
+  const aspect = bounds.w / Math.max(1, bounds.h);
+  const rowWidth = Math.max(
+    bounds.w,
+    widest + GAP * 2,
+    Math.sqrt(totalW * (ROW_H + GAP) * aspect),
+  );
+
   const items = [];
   let x = GAP, y = GAP, rowMax = 0, worldW = 0;
 

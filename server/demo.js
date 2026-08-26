@@ -37,10 +37,19 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
     { ns: 'kube-system', name: 'metrics-server', cpu: '50m', mem: '128Mi', replicas: 1 },
   ];
 
+  const POOLS = ['regular-pool-1', 'spot-pool-3', 'kube-system-pool', 'gateway-pool',
+                 'ingest-pool', 'qdrant-pool', 'monitoring-pool', 'batch-pool'];
+
   function makeNode(sizeIdx) {
     const sizes = [[4, 16], [8, 32], [16, 64], [2, 8]];
     const [c, g] = sizes[sizeIdx % sizes.length];
-    const name = `gke-farm-pool-${String(++nodeSeq).padStart(2, '0')}`;
+    // Managed-cluster shape: shared cluster prefix, a pool name, a pool hash and
+    // an instance suffix. Uniform names would hide what label shortening does.
+    const pool = POOLS[nodeSeq % POOLS.length];
+    const hash = (nodeSeq * 2654435761 % 0xfffffff).toString(16).slice(0, 8);
+    const inst = ((nodeSeq * 7919 + 104729) % 46655).toString(36).padStart(4, '0');
+    nodeSeq++;
+    const name = `gke-demo-cluster-${pool}-${hash}-${inst}`;
     const n = {
       kind: 'Node',
       metadata: { name, labels: { 'node.kubernetes.io/instance-type': `n2-standard-${c}` },
@@ -77,11 +86,38 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
   }
 
   function nodeNames() { return [...nodes.keys()]; }
+
+  // Place a pod on a node that can actually hold it, the way the scheduler
+  // would. Picking a node at random overcommits the cluster and the board ends
+  // up reporting 145% of CPU reserved, which is not a state Kubernetes allows.
+  // When nothing has room the pod stays Pending -- also what really happens.
+  function schedule(dep) {
+    const want = parseCpuish(dep.cpu);
+    const used = new Map();
+    for (const p of pods.values()) {
+      if (!p.spec.nodeName) continue;
+      if (p.status.phase === 'Succeeded' || p.status.phase === 'Failed') continue;
+      const r = parseCpuish((p.spec.containers[0].resources.requests || {}).cpu);
+      used.set(p.spec.nodeName, (used.get(p.spec.nodeName) || 0) + r);
+    }
+    const room = [];
+    for (const [name, n] of nodes) {
+      if (n.spec.unschedulable) continue;
+      const alloc = parseCpuish(n.status.allocatable.cpu);
+      if ((used.get(name) || 0) + want <= alloc * 0.95) room.push(name);
+    }
+    return room.length ? pick(room) : null;
+  }
+
+  function parseCpuish(v) {
+    if (!v) return 0;
+    const str = String(v);
+    return str.endsWith('m') ? parseFloat(str) / 1000 : parseFloat(str) || 0;
+  }
   function livePods() { return [...pods.values()].filter(p => p.status.phase !== 'Succeeded'); }
 
   // A real cluster hovers around a steady pod count. Without this the demo
   // would grow without bound and stop looking like anything real.
-  const TARGET_PODS = 34;
   function trimToTarget() {
     const live = livePods();
     let excess = live.length - TARGET_PODS;
@@ -104,17 +140,28 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
     transitions.onPod('MODIFIED', p);
   }
 
-  // Seed a plausible cluster.
-  for (let i = 0; i < 6; i++) makeNode(i);
-  for (const d of DEPLOYS) {
-    for (let i = 0; i < d.replicas; i++) { const p = makePod(d, pick(nodeNames())); ready(p); }
+  // Seed a plausible cluster. Size is configurable so the demo can stand in for
+  // a small cluster or a busy one -- which is what makes it usable for
+  // screenshots and for trying the density behaviour without a real cluster.
+  const NODE_COUNT = Math.max(1, config.demoNodes || 6);
+  const TARGET_PODS = Math.max(1, config.demoPods || 34);
+
+  for (let i = 0; i < NODE_COUNT; i++) makeNode(i);
+  {
+    const base = DEPLOYS.reduce((a, d) => a + d.replicas, 0);
+    const scale = Math.max(1, TARGET_PODS / base);
+    for (const d of DEPLOYS) {
+      const n = Math.max(1, Math.round(d.replicas * scale));
+      for (let i = 0; i < n; i++) { const p = makePod(d, schedule(d)); if (p.spec.nodeName) ready(p); }
+    }
   }
   setTimeout(() => { priming = false; }, 500);
 
   // The demo script: one action per beat, cycling through every transition the
   // renderer needs to handle.
   const script = [
-    () => { const d = pick(DEPLOYS); const p = makePod(d, pick(nodeNames())); setTimeout(() => ready(p), 1200); },
+    () => { const d = pick(DEPLOYS); const p = makePod(d, schedule(d));
+            if (p.spec.nodeName) setTimeout(() => ready(p), 1200); },
     () => { const p = pick(livePods()); if (!p) return;
             p.status.containerStatuses[0].restartCount++; transitions.onPod('MODIFIED', p); },
     () => { const p = pick(livePods()); if (!p) return;
@@ -124,7 +171,9 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
             setTimeout(() => { if (pods.has(p.metadata.uid)) {
               delete p.status.containerStatuses[0].state; ready(p); } }, 9000); },
     () => { // a Job runs and completes -- success, not a death
-            const p = makePod({ ns: 'batch', name: 'nightly-report', cpu: '200m', mem: '256Mi', kind: 'job' }, pick(nodeNames()));
+            const jd = { ns: 'batch', name: 'nightly-report', cpu: '200m', mem: '256Mi', kind: 'job' };
+            const p = makePod(jd, schedule(jd));
+            if (!p.spec.nodeName) return;
             ready(p);
             setTimeout(() => { p.status.phase = 'Succeeded'; transitions.onPod('MODIFIED', p);
               setTimeout(() => { pods.delete(p.metadata.uid); transitions.onPod('DELETED', p); }, 6000); }, 5000); },
@@ -141,7 +190,8 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
               message: `Scaled up replica set ${d.name} to ${n}`,
               involvedObject: { kind: 'Deployment', name: d.name, namespace: d.ns } });
             for (let i = 0; i < n; i++) {
-              const p = makePod(d, pick(nodeNames())); setTimeout(() => ready(p), 400 + i * 180); } },
+              const p = makePod(d, schedule(d));
+              if (p.spec.nodeName) setTimeout(() => ready(p), 400 + i * 180); } },
     () => { const victims = livePods().slice(0, 3 + Math.floor(rnd() * 5));   // scale-down
             transitions.onK8sEvent('ADDED', { metadata: { uid: 'ev' + (++uidSeq), namespace: 'web' },
               reason: 'ScalingReplicaSet', count: 1, message: `Scaled down replica set storefront to 2`,
@@ -153,7 +203,7 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
             transitions.onK8sEvent('ADDED', { metadata: { uid: 'ev' + (++uidSeq), namespace: 'default' },
               reason: 'TriggeredScaleUp', count: 1, message: 'pod triggered scale-up: 1 node added',
               involvedObject: { kind: 'Pod', name: 'pending-pod', namespace: 'default' } }); },
-    () => { const names = nodeNames(); if (names.length <= 4) return;         // drain + remove
+    () => { const names = nodeNames(); if (names.length <= NODE_COUNT) return;   // drain + remove
             const victim = names[names.length - 1]; const n = nodes.get(victim);
             n.spec.unschedulable = true; transitions.onNode('MODIFIED', n);
             const residents = [...pods.values()].filter(p => p.spec.nodeName === victim);
@@ -187,15 +237,25 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
       const w = buildWorld({ nodes: new Map([[n.metadata.name, n]]), pods,
         nodeMetrics: new Map(), podMetrics: new Map(), config, link, context: 'demo' });
       const nn = w.nodes[0];
-      const drift = 0.45 + 0.75 * rnd();
+      const r = rnd();
+      // Squared: clusters are mostly idle relative to what they reserved.
+      const drift = 0.10 + 0.55 * r * r;
       nodeMetrics.set(n.metadata.name, {
-        cpu: Math.min(nn.cpu.allocatable, nn.cpu.requests * drift + 0.2),
-        mem: Math.min(nn.mem.allocatable, nn.mem.requests * (0.5 + 0.6 * rnd()) + 256 * 1024 ** 2),
+        cpu: Math.min(nn.cpu.allocatable, nn.cpu.requests * drift + 0.05),
+        mem: Math.min(nn.mem.allocatable, nn.mem.requests * (0.35 + 0.4 * rnd()) + 128 * 1024 ** 2),
       });
     }
     for (const p of pods.values()) {
+      const req = parseFloat(((p.spec.containers[0].resources.requests || {}).cpu || '0').replace('m', '')) || 0;
+      const reqCores = String((p.spec.containers[0].resources.requests || {}).cpu || '').includes('m')
+        ? req / 1000 : req;
+      const r = rnd();
+      // Most well under their request; about one in twenty over it, which is the
+      // ratio worth showing rather than half the cluster on fire.
+      const ratio = r > 0.95 ? 1.05 + rnd() * 0.9 : 0.05 + 0.45 * r * r;
+      const base = reqCores > 0 ? reqCores : 0.04;
       podMetrics.set(`${p.metadata.namespace}/${p.metadata.name}`,
-        { cpu: 0.02 + rnd() * 0.4, mem: (40 + rnd() * 300) * 1024 ** 2 });
+        { cpu: base * ratio, mem: (40 + rnd() * 300) * 1024 ** 2 });
     }
   }
   refreshMetrics();

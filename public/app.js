@@ -86,13 +86,22 @@ function clearSelection() {
 // dialog and walks away, it closes itself rather than covering the farm all day.
 const LEGEND_AUTOCLOSE_MS = 90000;
 
-const stored = (k, fallback, valid) => {
+// Query parameters win over stored preferences, so a specific board can be
+// deep-linked -- one kiosk showing the dungeon side view, another the farm --
+// and so a screenshot can be scripted without driving the UI by hand.
+//   ?skin=farm&view=sideon&tier=8bit&zoom=fit&hud=0
+const params = new URLSearchParams(location.search);
+const stored = (k, fallback, valid, param) => {
+  const q = params.get(param);
+  if (q && valid[q]) return q;
   const v = localStorage.getItem(k);
   return v && valid[v] ? v : fallback;
 };
-let skinId = stored('k8sfarm.skin', 'farm', SKINS);
-let tierId = stored('k8sfarm.tier', '64bit', TIERS);
-let viewId = stored('k8sfarm.view', 'topdown', VIEWS);
+const hourParam = parseFloat(params.get('hour'));
+const pinnedHour = Number.isFinite(hourParam) && hourParam >= 0 && hourParam < 24 ? hourParam : null;
+let skinId = stored('k8sfarm.skin', 'farm', SKINS, 'skin');
+let tierId = stored('k8sfarm.tier', '64bit', TIERS, 'tier');
+let viewId = stored('k8sfarm.view', 'topdown', VIEWS, 'view');
 
 // The engine's backbuffer depends on the tier, so it is reconfigured whenever
 // the tier or the window changes -- not every frame.
@@ -220,7 +229,11 @@ function connect() {
   es.addEventListener('config', (m) => {
     try {
       cfg = { ...cfg, ...JSON.parse(m.data) };
-      if (!localStorage.getItem('k8sfarm.skin') && cfg.defaultSkin) skinId = cfg.defaultSkin;
+      // Only fall back to the server default when the viewer has expressed no
+      // preference at all -- neither a URL parameter nor a stored one.
+      if (!params.get('skin') && !localStorage.getItem('k8sfarm.skin') && cfg.defaultSkin) {
+        skinId = cfg.defaultSkin;
+      }
     } catch {}
   });
   es.addEventListener('state', (m) => {
@@ -235,6 +248,14 @@ function connect() {
       if (!booted) {
         booted = true;
         document.getElementById('boot').classList.add('gone');
+        // The camera has to be told the world size before it can fit to it;
+        // drawScene normally does that, and has not run yet on the first frame.
+        const z = params.get('zoom');
+        if (z) {
+          cam.setWorld(model.world.w, model.world.h);
+          if (z === 'fit') cam.fit();
+          else if (Number.isFinite(parseFloat(z))) cam.zoomTo(parseFloat(z));
+        }
         // Paint as soon as there is something to show. A tab that is opened in
         // the background gets no animation frames, so without this the board
         // stays black until it is looked at.
@@ -467,7 +488,7 @@ function drawScene(now, dt) {
   const skin = SKINS[skinId];
   const view = VIEWS[viewId];
   const tier = TIERS[tierId];
-  const hours = clockHours(Date.now(), cfg.clockSpeed);
+  const hours = pinnedHour != null ? pinnedHour : clockHours(Date.now(), cfg.clockSpeed);
 
   Object.assign(q, tier);
   q.u = engine.u;
@@ -574,6 +595,13 @@ window.__k8sfarmSelect = (uid) => {
 
 // Advances the animation by a simulated span, so roaming can be verified in a
 // backgrounded tab where requestAnimationFrame is throttled to nothing.
+window.__k8sfarmFit = () => {
+  cam.setWorld(model.world.w, model.world.h);
+  cam.fit();
+  renderNow();
+  return { zoom: +cam.zoom.toFixed(3), world: cam.world, canScroll: cam.canScroll() };
+};
+
 window.__k8sfarmPan = (dir, ms = 600) => {
   keys[dir] = true;
   for (let t = 0; t < ms; t += 16) cam.step(16, keys);

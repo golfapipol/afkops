@@ -129,6 +129,7 @@ export function createCamera() {
 
   return {
     pan, step, fit, zoomIn, zoomOut, setWorld, toWorld, centerOn, isVisible, canScroll,
+    zoomTo: setZoom,
     get x() { return x; }, get y() { return y; },
     get zoom() { return zoom(); },
     get world() { return world; },

@@ -21,6 +21,8 @@ catch (e) { console.warn('[k8s-farm] using defaults, config.json unreadable:', e
 const PORT = Number(arg('port', process.env.PORT || config.port)) || 8787;
 config.clockSpeed = Number(arg('clock-speed', 1)) || 1;
 config.demoBeatMs = Number(arg('beat', config.demoBeatMs || 2600));
+config.demoNodes = Number(arg('nodes', config.demoNodes || 6));
+config.demoPods = Number(arg('pods', config.demoPods || 34));
 
 // A 24/7 wallboard must never die from one bad frame. Log and carry on.
 process.on('uncaughtException', (e) => console.error('[k8s-farm] uncaught:', e && e.stack || e));
@@ -193,7 +195,17 @@ function shutdown(sig) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-collector.start().then(() => {
+// Real mode only: the demo needs no cluster and no kubectl.
+const checked = DEMO ? Promise.resolve() : require('./kubectl.js').preflight().then((r) => {
+  if (r.version) console.log(`[k8s-farm] kubectl ${r.version}`);
+  for (const p of r.problems) console.error(`[k8s-farm] REQUIREMENT: ${p}`);
+  if (r.problems.length) {
+    console.error('[k8s-farm] see the Requirements section of the README');
+    process.exit(1);
+  }
+}).catch(() => {});
+
+checked.then(() => collector.start()).then(() => {
   tickSnapshot();
   server.listen(PORT, '127.0.0.1', () => {
     const url = `http://localhost:${PORT}`;

@@ -154,6 +154,31 @@ function createWatch({ args, onEvent, onStatus, name }) {
   return { start, stop };
 }
 
+// The whole design rests on `kubectl get --watch --output-watch-events`, which
+// older kubectl does not have. Without this check the symptom is a board that
+// simply never populates, with nothing saying why -- so check once at startup
+// and say exactly what is wrong.
+async function preflight() {
+  const problems = [];
+  let version = '';
+  try {
+    version = (await kubectlText(['version', '--client', '-o', 'json'], { timeoutMs: 10000 }));
+    const j = JSON.parse(version);
+    version = (j.clientVersion && j.clientVersion.gitVersion) || '';
+  } catch { version = 'unknown'; }
+
+  try {
+    const help = await kubectlText(['get', '--help'], { timeoutMs: 10000 });
+    if (!help.includes('--output-watch-events')) {
+      problems.push(`kubectl ${version} has no --output-watch-events; k8s-farm needs kubectl 1.20 or newer`);
+    }
+  } catch (e) {
+    problems.push(`could not run kubectl: ${summarizeError(String(e.message || e))}`);
+  }
+
+  return { version, problems };
+}
+
 function currentContext() {
   return kubectlText(['config', 'current-context'], { timeoutMs: 5000 })
     .then((s) => s.trim())
@@ -161,4 +186,4 @@ function currentContext() {
 }
 
 module.exports = { kubectlJson, kubectlText, createWatch, currentContext, summarizeError,
-                   unwrapWatchValue, KUBECTL };
+                   unwrapWatchValue, preflight, KUBECTL };
