@@ -51,17 +51,21 @@ function floorTop(r) { return r.y + r.h - FLOOR_T; }
 // Ranks give a flat side view its depth: the back rank sits higher and reads as
 // further away. How many ranks there are depends on how crowded the floor is --
 // a busy node stacks more of them rather than hiding pods behind a badge.
-export function spriteMetrics(rect, node, q) {
+export function spriteMetrics(rect, node, q, opts) {
   const availW = Math.max(8, rect.w - 4);
   const availH = Math.max(6, rect.h - FLOOR_T - 12);
   const count = Math.max(1, (node && node.pods.count) || 1);
-  const maxRanks = Math.max(1, Math.min(5, Math.floor(availH / 4)));
+  // Swimmers get the whole column to spread through; standers are limited to a
+  // few ranks above the floor.
+  const maxRanks = opts && opts.swims
+    ? Math.max(1, Math.min(9, Math.floor(availH / 5)))
+    : Math.max(1, Math.min(5, Math.floor(availH / 4)));
   const m = fitSprites(availW, availH, count, q.unitSize, maxRanks);
-  return { size: m.size, cols: m.cols, rows: m.rows, detailed: m.size >= 7 };
+  return { size: m.size, cols: m.cols, rows: m.rows, detailed: m.size >= 7, swims: !!(opts && opts.swims) };
 }
 
-export function slotPos(rect, slot, node, pod, q, m) {
-  const met = m || spriteMetrics(rect, node, q);
+export function slotPos(rect, slot, node, pod, q, m, opts) {
+  const met = m || spriteMetrics(rect, node, q, opts);
   const s = met.size;
   const alloc = (node && node.cpu.allocatable) || 1;
   const reqFrac = Math.min(1, ((node && node.cpu.requests) || 0) / alloc);
@@ -78,16 +82,24 @@ export function slotPos(rect, slot, node, pod, q, m) {
   const cols = Math.max(1, met.cols), ranks = Math.max(1, met.rows);
   const c = slot % cols, rk = Math.floor(slot / cols) % ranks;
   const spanW = Math.max(0, bw - s);
-  const homeY = floorTop(rect) - s - rk * (s * 0.62);
+  // Standers sit above the floor; swimmers are spread through the column and
+  // drift vertically as well as along.
+  const top = rect.y + 12;
+  const bottom = floorTop(rect) - s;
+  const homeY = met.swims
+    ? (ranks === 1 ? (top + bottom) / 2 : top + (rk / (ranks - 1)) * Math.max(0, bottom - top))
+    : bottom - rk * (s * 0.62);
+  const colH = Math.max(0, bottom - top);
   return {
     x: bx + (cols === 1 ? spanW / 2 : (c / (cols - 1)) * spanW),
     y: homeY,
     size: s,
     roamX: (bw / cols) * 0.9,
-    roamY: 0,                 // they walk along the floor, not up the wall
+    roamY: met.swims ? (colH / Math.max(1, ranks)) * 0.9 : 0,
     minX: bx, maxX: bx + Math.max(0, bw - s),
-    minY: homeY, maxY: homeY,
-    grounded: true,
+    minY: met.swims ? top : homeY,
+    maxY: met.swims ? bottom : homeY,
+    grounded: !met.swims,
     rank: rk,
   };
 }
@@ -140,6 +152,18 @@ export function drawContainer(g, node, r, ctx) {
           px(g, r.x + 1, ry, litW - 2, 2, down ? '#33301f' : '#5c7a2e');
           px(g, r.x + 1, ry, litW - 2, 0.5, down ? '#3a3626' : '#9ac257');
         }
+      } else if (style === 'gravel') {
+        // Bubbles streaming up through the stocked water: the tank is working.
+        vgrad(g, r.x, deckY, litW, deckH, rgba(lit, 0.26), rgba(lit, 0.05), q);
+        for (let bx2 = r.x + 5; bx2 < r.x + litW - 2; bx2 += 13) {
+          const phase = (t * 0.05 + bx2 * 7) % (deckH + 6);
+          for (let k = 0; k < 3; k++) {
+            const by = deckY + deckH - ((phase + k * 9) % (deckH + 6));
+            if (by < deckY || by > deckY + deckH) continue;
+            const r2 = 0.6 + (k % 2) * 0.5;
+            px(g, bx2 + Math.sin(by * 0.4) * 1.2, by, r2 * 2, r2 * 2, rgba('#ffffff', 0.5));
+          }
+        }
       } else if (style === 'stone') {
         // Torch-lit chambers: pooled light rather than regular glazing.
         vgrad(g, r.x, deckY, litW, deckH, rgba(lit, 0.22), rgba(lit, 0.04), q);
@@ -190,6 +214,11 @@ export function drawContainer(g, node, r, ctx) {
     }
   } else if (style === 'plate') {
     for (let gx = r.x + 4; gx < r.x + r.w - 2; gx += 8) px(g, gx, fy + 1, 1, FLOOR_T - 2, shade(floorCol, -0.35));
+  } else if (style === 'gravel') {
+    for (let gx = r.x; gx < r.x + r.w; gx += 2) {
+      const h2 = 1 + (hash(node.name + gx) % 2);
+      px(g, gx, fy - h2 + 1, 2, h2 + 1, down ? shade(pal.grit || pal.soil, -0.45) : (pal.grit || shade(pal.soil, 0.18)));
+    }
   } else {
     for (let gx = r.x + 6; gx < r.x + r.w - 2; gx += 12) px(g, gx, fy, 1, FLOOR_T, shade(floorCol, -0.35));
   }

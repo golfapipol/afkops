@@ -46,6 +46,13 @@ follows the real clock.</sub></td>
 <sub><b>Dungeon skin</b> — rooms and a party, torch-lit. Pod tiers become
 <code>IMP</code>/<code>ROGUE</code>/<code>KNIGHT</code>/<code>GIANT</code>.</sub></td>
 </tr>
+<tr>
+<td width="50%" colspan="2"><img src="https://raw.githubusercontent.com/golfapipol/afkops/main/docs/aquarium-sideon.png" alt="Aquarium skin"><br>
+<sub><b>Aquarium skin</b> — tanks seen from the side, which is how you actually
+look at one. Tank width is capacity, the stocked blue water is what pods
+reserved, bubbles are live usage, and fish swim through the column facing
+wherever they are heading. A failed node goes cloudy and still.</sub></td>
+</tr>
 </table>
 
 ![8-bit tier](https://raw.githubusercontent.com/golfapipol/afkops/main/docs/farm-8bit.png)
@@ -58,7 +65,7 @@ All screenshots are of the **synthetic demo cluster** — see
 
 | key | action |
 |---|---|
-| `1` `2` `3` | Farm / Factory / Dungeon skin |
+| `1`–`4` | Farm / Factory / Dungeon / Aquarium skin |
 | `V` | view: top-down ⇄ side-on |
 | `G` | graphics: 8-bit ⇄ 64-bit |
 | `Q` / `W` | force 8-bit / 64-bit |
@@ -79,6 +86,10 @@ left it after a reload or the nightly refresh.
 
 Skin, view and fidelity are independent — any of the twelve combinations works,
 because all three describe the same data rather than replacing it.
+
+**Skins** — `1`–`4`. Same data, four vocabularies: farm plots, factory floors,
+dungeon rooms, aquarium tanks. A skin earns its place by giving the data a
+different *reading*, not just different art.
 
 **Views**
 
@@ -139,12 +150,12 @@ Every creature is **one pod**. Its **shape is what it reserved**; how it
 different facts, so they get different visual channels and can disagree — which
 is the whole point.
 
-| Farm | Factory | Dungeon | CPU request |
-|---|---|---|---|
-| Crop | Belt | Imp | **none** — BestEffort, the scheduler sees nothing |
-| Chicken | Press | Rogue | up to 100m |
-| Sheep | Furnace | Knight | up to 500m |
-| Cow | Reactor | Giant | over 500m |
+| Farm | Factory | Dungeon | Aquarium | CPU request |
+|---|---|---|---|---|
+| Crop | Belt | Imp | Algae | **none** — BestEffort, the scheduler sees nothing |
+| Chicken | Press | Rogue | Guppy | up to 100m |
+| Sheep | Furnace | Knight | Koi | up to 500m |
+| Cow | Reactor | Giant | Shark | over 500m |
 
 Thresholds are fixed round numbers, not percentiles of the current cluster, so a
 chicken means the same thing tomorrow and on someone else's cluster. Sprites also

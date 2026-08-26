@@ -29,6 +29,15 @@ export function drawCompact(g, x, y, s, col, shape, opts) {
     px(g, x + s * 0.14, y + s * 0.32, s * 0.72, s * 0.46, col);
     px(g, x + s * 0.14, y + s * 0.32, s * 0.72, s * 0.14, lit);
     if (o.lamp) px(g, x + s * 0.66, y + s * 0.4, s * 0.24, s * 0.2, o.lamp);
+  } else if (shape === 'fish') {             // aquarium: fish, facing their travel
+    const dir = (opts && opts.flip) ? -1 : 1;
+    const bx = dir > 0 ? x : x + s;
+    px(g, bx + dir * s * 0.12, y + s * 0.28, dir * s * 0.62, s * 0.42, line);
+    px(g, bx + dir * s * 0.18, y + s * 0.34, dir * s * 0.5, s * 0.3, col);
+    px(g, bx + dir * s * 0.18, y + s * 0.34, dir * s * 0.5, s * 0.1, lit);
+    // Tail at the back, eye at the front: enough to read direction at 4px.
+    px(g, bx, y + s * 0.3, dir * s * 0.16, s * 0.38, col);
+    if (s >= 4) px(g, bx + dir * s * 0.62, y + s * 0.4, dir * Math.max(1, s * 0.1), s * 0.12, '#101018');
   } else {                                   // dungeon: figures
     px(g, x + s * 0.24, y, s * 0.5, s * 0.3, '#c9a07a');         // head
     px(g, x + s * 0.14, y + s * 0.3, s * 0.7, s * 0.48, line);

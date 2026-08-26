@@ -29,6 +29,7 @@ const SHOTS = [
   ['farm-8bit',       'skin=farm&view=topdown&tier=8bit&zoom=fit&hour=11'],
   ['factory-night',   'skin=factory&view=sideon&tier=64bit&zoom=fit&hour=22'],
   ['dungeon-topdown', 'skin=dungeon&view=topdown&tier=64bit&zoom=fit&hour=11'],
+  ['aquarium-sideon', 'skin=aquarium&view=sideon&tier=64bit&zoom=fit&hour=12'],
   ['truescale',       'skin=farm&view=topdown&tier=64bit&zoom=1&hour=15'],
 ];
 

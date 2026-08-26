@@ -67,7 +67,7 @@ export function computeLayout(nodes, bounds) {
 // Sprite size and grid are derived from how many pods actually share the plot,
 // so every pod gets a place. A fixed cap plus a "+47" badge hides most of a busy
 // node, which is exactly the information you opened the board to see.
-export function spriteMetrics(rect, node, q) {
+export function spriteMetrics(rect, node, q, _opts) {
   const s0 = q.unitSize;
   const availW = Math.max(8, rect.w - 8);
   const availH = Math.max(8, rect.h - 20);
@@ -82,7 +82,7 @@ export function spriteMetrics(rect, node, q) {
 //
 // The returned point is the pod's HOME cell. Roaming happens around it, so the
 // crowd stays evenly spread instead of clumping while still looking alive.
-export function slotPos(rect, slot, node, pod, q, m) {
+export function slotPos(rect, slot, node, pod, q, m, _opts) {
   const met = m || spriteMetrics(rect, node, q);
   const s = met.size;
   const ix = rect.x + 4, iy = rect.y + 13;

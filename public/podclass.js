@@ -9,10 +9,10 @@
 // Thresholds are fixed round numbers, not percentiles of the current cluster,
 // so "chicken" means the same thing tomorrow and on a different cluster.
 export const TIERS = [
-  { id: 'none',  farm: 'CROP',    factory: 'BELT',    dungeon: 'IMP',    label: 'NO REQUEST', short: 'NONE' },
-  { id: 'small', farm: 'CHICKEN', factory: 'PRESS',   dungeon: 'ROGUE',  label: 'up to 100m', short: '≤100m' },
-  { id: 'mid',   farm: 'SHEEP',   factory: 'FURNACE', dungeon: 'KNIGHT', label: 'up to 500m', short: '≤500m' },
-  { id: 'large', farm: 'COW',     factory: 'REACTOR', dungeon: 'GIANT',  label: 'over 500m',  short: '>500m' },
+  { id: 'none',  farm: 'CROP',    factory: 'BELT',    dungeon: 'IMP',    aquarium: 'ALGAE', label: 'NO REQUEST', short: 'NONE' },
+  { id: 'small', farm: 'CHICKEN', factory: 'PRESS',   dungeon: 'ROGUE',  aquarium: 'GUPPY', label: 'up to 100m', short: '≤100m' },
+  { id: 'mid',   farm: 'SHEEP',   factory: 'FURNACE', dungeon: 'KNIGHT', aquarium: 'KOI',   label: 'up to 500m', short: '≤500m' },
+  { id: 'large', farm: 'COW',     factory: 'REACTOR', dungeon: 'GIANT',  aquarium: 'SHARK', label: 'over 500m',  short: '>500m' },
 ];
 
 const T_SMALL = 0.1;    // cores

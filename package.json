@@ -1,6 +1,6 @@
 {
   "name": "afkops",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Your Kubernetes cluster as an idle game: a pixel-art wallboard for node capacity, pod allocation and live usage",
   "keywords": [
     "kubernetes", "k8s", "dashboard", "wallboard", "monitoring",
@@ -21,6 +21,7 @@
     "public/",
     "config.json",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {

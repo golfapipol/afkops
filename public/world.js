@@ -42,13 +42,14 @@ export function createWorldModel() {
     return base;
   }
 
-  function update(next, now, view, q) {
+  function update(next, now, view, q, opts) {
     state = next;
     const dense = next.pods.length;
 
     // Recompute layout when the node set or the view changes; otherwise reuse
     // it so positions stay put between frames.
-    const key = view.id + '|' + q.id + '|' + next.nodes.map((n) => n.name).join(',');
+    const key = view.id + '|' + q.id + '|' + (opts && opts.swims ? 'swim' : 'stand')
+              + '|' + next.nodes.map((n) => n.name).join(',');
     // A view or tier change is a different camera, not motion: sprites should
     // appear in the new arrangement rather than gliding across the screen from
     // wherever they stood in the old one.
@@ -68,7 +69,7 @@ export function createWorldModel() {
 
     // Recomputed each update: pod counts change, and sprite size follows them.
     for (const l of layout) {
-      l.metrics = view.spriteMetrics ? view.spriteMetrics(l.rect, l.node, q) : { size: q.unitSize, cols: 6, rows: 4, detailed: true };
+      l.metrics = view.spriteMetrics ? view.spriteMetrics(l.rect, l.node, q, opts) : { size: q.unitSize, cols: 6, rows: 4, detailed: true };
       if (!plots.has(l.node.name)) plots.set(l.node.name, { born: now, seed: hash(l.node.name), fx: null });
     }
     for (const k of [...plots.keys()]) if (!byName.has(k)) plots.delete(k);
@@ -94,7 +95,7 @@ export function createWorldModel() {
       let u = units.get(pod.uid);
       if (!u) {
         const slot = slotFor(pod.node, pod.uid, t);
-        const p = view.slotPos(l.rect, slot, l.node, pod, q, l.metrics);
+        const p = view.slotPos(l.rect, slot, l.node, pod, q, l.metrics, opts);
         u = { slot, seed: hash(pod.uid), born: now, x: p.x, y: p.y, tx: p.x, ty: p.y,
               hx: p.x, hy: p.y, roamX: p.roamX || 0, roamY: p.roamY || 0,
               minX: p.minX, maxX: p.maxX, minY: p.minY, maxY: p.maxY,
@@ -109,7 +110,7 @@ export function createWorldModel() {
           u.slot = slotFor(pod.node, pod.uid, t);
           u.fx = 'walk'; u.fxUntil = now + 1400;
         }
-        const p = view.slotPos(l.rect, u.slot, l.node, pod, q, l.metrics);
+        const p = view.slotPos(l.rect, u.slot, l.node, pod, q, l.metrics, opts);
         // Home cell, not the target: the target is where it is currently wandering.
         const homeMoved = Math.abs((u.hx || 0) - p.x) > 0.5 || Math.abs((u.hy || 0) - p.y) > 0.5;
         u.hx = p.x; u.hy = p.y;

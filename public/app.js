@@ -14,9 +14,10 @@ import * as sideon from './views/sideon.js';
 import * as farm from './skins/farm.js';
 import * as factory from './skins/factory.js';
 import * as dungeon from './skins/dungeon.js';
+import * as aquarium from './skins/aquarium.js';
 
-const SKINS = { farm, factory, dungeon };
-const SKIN_ORDER = ['farm', 'factory', 'dungeon'];
+const SKINS = { farm, factory, dungeon, aquarium };
+const SKIN_ORDER = ['farm', 'factory', 'dungeon', 'aquarium'];
 const VIEWS = { topdown, sideon };
 const VIEW_ORDER = ['topdown', 'sideon'];
 
@@ -25,6 +26,13 @@ const engine = createEngine(canvas);
 const g = engine.g;
 const model = createWorldModel();
 const cam = createCamera();
+
+// Capabilities the active skin needs the view to know about — whether its units
+// stand on the floor or swim through the column, for instance.
+const skinOpts = () => {
+  const sk = SKINS[skinId];
+  return { swims: !!(sk && sk.side && sk.side.swims) };
+};
 
 let cfg = { defaultSkin: 'farm', autoRotateSkinMs: 0, nightlyReloadHour: 4, clockSpeed: 1, demo: false };
 let world = null, hist = null;
@@ -118,7 +126,7 @@ function renderNow() {
 function applyTier() {
   engine.configure(TIERS[tierId]);
   model.invalidate();
-  if (world) model.update(world, performance.now(), VIEWS[viewId], TIERS[tierId]);
+  if (world) model.update(world, performance.now(), VIEWS[viewId], TIERS[tierId], skinOpts());
   renderNow();
 }
 applyTier();
@@ -240,7 +248,7 @@ function connect() {
     try {
       const s = JSON.parse(m.data);
       world = s; link = s.link || link;
-      model.update(s, performance.now(), VIEWS[viewId], TIERS[tierId]);
+      model.update(s, performance.now(), VIEWS[viewId], TIERS[tierId], skinOpts());
       if (selectedUid && podDetail && !podDetail.loading && !podDetail.error
           && !s.pods.some((pd) => pd.uid === selectedUid)) {
         podDetail = { error: true };
@@ -286,8 +294,17 @@ setInterval(() => {
 
 // ---- input -----------------------------------------------------------------
 function setSkin(i) {
-  skinId = SKIN_ORDER[i] || 'farm';
+  const next = SKIN_ORDER[i] || 'farm';
+  const wasSwim = skinOpts().swims;
+  skinId = next;
   localStorage.setItem('k8sfarm.skin', skinId);
+  // Skins can change how units are placed (standing vs swimming), so a switch
+  // that crosses that boundary has to re-place them rather than wait for the
+  // next state frame.
+  if (world && skinOpts().swims !== wasSwim) {
+    model.invalidate();
+    model.update(world, performance.now(), VIEWS[viewId], TIERS[tierId], skinOpts());
+  }
   renderNow();
 }
 function setTier(id) {
@@ -300,7 +317,7 @@ function setView(id) {
   viewId = id; localStorage.setItem('k8sfarm.view', viewId);
   model.invalidate();
   // Re-place sprites immediately so the switch reads as a camera move, not a jump.
-  if (world) model.update(world, performance.now(), VIEWS[viewId], TIERS[tierId]);
+  if (world) model.update(world, performance.now(), VIEWS[viewId], TIERS[tierId], skinOpts());
   renderNow();
 }
 
@@ -314,9 +331,8 @@ function cycleTier() { setTier(tierId === '8bit' ? '64bit' : '8bit'); }
 
 window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
-  if (k === '1') setSkin(0);
-  else if (k === '2') setSkin(1);
-  else if (k === '3') setSkin(2);
+  // Number keys map onto the skin list, however long it is.
+  if (/^[1-9]$/.test(k) && Number(k) <= SKIN_ORDER.length) setSkin(Number(k) - 1);
   else if (k === 'v') setView(viewId === 'topdown' ? 'sideon' : 'topdown');
   else if (k === 'g') setTier(tierId === '8bit' ? '64bit' : '8bit');
   else if (k === 'l') { legendOpen = !legendOpen; legendOpenedAt = performance.now(); }
@@ -381,7 +397,7 @@ canvas.addEventListener('click', (e) => {
 });
 
 setInterval(() => {
-  if (cfg.autoRotateSkinMs > 0) setSkin((SKIN_ORDER.indexOf(skinId) + 1) % 3);
+  if (cfg.autoRotateSkinMs > 0) cycleSkin();
 }, Math.max(10000, cfg.autoRotateSkinMs || 600000));
 
 document.addEventListener('visibilitychange', () => {
@@ -389,7 +405,7 @@ document.addEventListener('visibilitychange', () => {
   fetch('/api/state').then((r) => r.json()).then((s) => {
     if (s && s.nodes) {
       world = s; link = s.link || link;
-      model.update(s, performance.now(), VIEWS[viewId], TIERS[tierId]);
+      model.update(s, performance.now(), VIEWS[viewId], TIERS[tierId], skinOpts());
     }
   }).catch(() => {});
 });
