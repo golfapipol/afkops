@@ -13,7 +13,7 @@ npx afkops --wall     # 24/7 board: keeps the display awake
 It opens <http://localhost:8787> itself. Press **F11** for fullscreen, **`?`** for
 the legend. Read-only — it never changes anything in your cluster.
 
-![Farm skin, top-down](https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/farm-topdown.png)
+![Farm skin, top-down](https://raw.githubusercontent.com/golfapipol/afkops/main/docs/farm-topdown.png)
 
 *Twelve nodes at true scale: `kube-system-pool` has 16 cores so its plot is
 genuinely eight times the width of the 2-core pools above it. Green rows are CPU
@@ -23,26 +23,26 @@ and the sidebar ranks what needs attention.*
 
 <table>
 <tr>
-<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/truescale.png" alt="Zoomed in"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/afkops/main/docs/truescale.png" alt="Zoomed in"><br>
 <sub><b>Zoomed to 100%</b> — one sprite per pod. Sheep, cows and chickens are
 CPU request tiers; a cordoned node reads <code>CLOSED</code>. The minimap shows
 how much cluster is off-screen.</sub></td>
-<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/farm-sideon.png" alt="Side-on view"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/afkops/main/docs/farm-sideon.png" alt="Side-on view"><br>
 <sub><b>Side-on view</b> (<code>V</code>) — the same data as a building. Floor
 width is still capacity, so the floors are comparable down the stack.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/factory-night.png" alt="Factory skin at night"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/afkops/main/docs/factory-night.png" alt="Factory skin at night"><br>
 <sub><b>Factory skin at night</b> — same cluster, industrial vocabulary
 (<code>POWER</code>, <code>STORAGE</code>, machines on floors). The palette
 follows the real clock.</sub></td>
-<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/dungeon-topdown.png" alt="Dungeon skin"><br>
+<td width="50%"><img src="https://raw.githubusercontent.com/golfapipol/afkops/main/docs/dungeon-topdown.png" alt="Dungeon skin"><br>
 <sub><b>Dungeon skin</b> — rooms and a party, torch-lit. Pod tiers become
 <code>IMP</code>/<code>ROGUE</code>/<code>KNIGHT</code>/<code>GIANT</code>.</sub></td>
 </tr>
 </table>
 
-![8-bit tier](https://raw.githubusercontent.com/golfapipol/k8s-farm-simulation/main/docs/farm-8bit.png)
+![8-bit tier](https://raw.githubusercontent.com/golfapipol/afkops/main/docs/farm-8bit.png)
 
 *The same board in the **8-bit** tier (`G`): a fixed 640×360 buffer, integer-upscaled
 and letterboxed, with flat colour and dithered shading instead of gradients.*
@@ -331,7 +331,7 @@ reasons worth animating.
 ### Screenshots
 
 ```bash
-git clone https://github.com/golfapipol/k8s-farm-simulation && cd k8s-farm-simulation
+git clone https://github.com/golfapipol/afkops && cd afkops
 npm test             # 53 tests, no install step
 npm run shots        # regenerates docs/*.png from the demo cluster
 ```

@@ -170,7 +170,7 @@ async function preflight() {
   try {
     const help = await kubectlText(['get', '--help'], { timeoutMs: 10000 });
     if (!help.includes('--output-watch-events')) {
-      problems.push(`kubectl ${version} has no --output-watch-events; k8s-farm needs kubectl 1.20 or newer`);
+      problems.push(`kubectl ${version} has no --output-watch-events; afkops needs kubectl 1.20 or newer`);
     }
   } catch (e) {
     problems.push(`could not run kubectl: ${summarizeError(String(e.message || e))}`);

@@ -271,7 +271,7 @@ function connect() {
   es.onerror = () => {
     // Streams drop for ordinary reasons; reconnect with backoff and keep
     // rendering the last known world in the meantime.
-    link = { ...link, ok: false, error: 'lost connection to k8s-farm server' };
+    link = { ...link, ok: false, error: 'lost connection to the afkops server' };
     try { es.close(); } catch {}
     es = null;
     setTimeout(connect, reconnectDelay);
