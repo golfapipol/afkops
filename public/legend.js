@@ -2,12 +2,19 @@
 import { px, rect, text, textRight, textW, shade, rgba } from './engine.js';
 import { TIERS, TIER_SCALE } from './podclass.js';
 import { drawHotMark, drawRestartMark, HOT_COL, SCAR_COL } from './sprite.js';
+import { levelColor } from './triage.js';
 import { HUD, SCENE } from './world.js';
 import { closeBox, drawCloseBox } from './ui.js';
 
 // The legend draws the REAL sprites by calling the skin's own drawUnit, so it
 // can never fall out of step with what is on the farm. A hand-drawn legend key
 // would quietly go stale the first time a sprite changed.
+// Drawn the same way the scene draws it, so the key cannot drift.
+function drawBadgeSample(g, x, y, s, col) {
+  px(g, x, y, s, s, col);
+  px(g, x + s * 0.25, y + s * 0.25, s * 0.5, s * 0.5, '#000000aa');
+}
+
 function fakeUnit(tierIdx, opts = {}) {
   const cpuReq = [0, 0.05, 0.3, 1.5][tierIdx];
   return {
@@ -71,13 +78,19 @@ export function drawHudLegend(g, ctx, skin, y) {
   drawRestartMark(g, x + 3, y - 4, 7, 5);
   text(g, 'RESTARTED BEFORE', x + 14, y, SCAR_COL, 5);
   y += 10;
+  // The badge on a plot corner: what someone notices first and has no way to
+  // look up otherwise.
+  drawBadgeSample(g, x + 3, y, 5, levelColor(5, pal));
+  text(g, 'NEEDS ATTENTION', x + 14, y, levelColor(5, pal), 5);
+  text(g, 'CLICK A ' + ((skin.vocab.node) || 'NODE'), x + 96, y, pal.dim, 5);
+  y += 10;
   return y;
 }
 
 // ---- full overlay, on demand ---------------------------------------------
 export function drawFullLegend(g, ctx, skin, view) {
   const { pal, q, W, H } = ctx;
-  const w = 436, h = 314;
+  const w = 436, h = 352;
   const x = Math.round((SCENE.w - w) / 2), y = Math.round((H - h) / 2) - 4;
   const panel = { x, y, w, h };
 
@@ -153,6 +166,17 @@ export function drawFullLegend(g, ctx, skin, view) {
   drawRestartMark(g, x + 14, ty - 6, 9, 5);
   text(g, 'SCARS UNDER THE FEET', x + 32, ty, SCAR_COL, 5);
   text(g, 'already happened — it has restarted before', x + 150, ty, pal.dim, 5);
+  ty += 14;
+
+  text(g, `THE BADGE ON A ${(skin.vocab.node || 'NODE')}`, x + 8, ty, pal.ink, 6);
+  ty += 11;
+  drawBadgeSample(g, x + 14, ty, 7, levelColor(5, pal));
+  text(g, 'NEEDS ATTENTION', x + 32, ty, levelColor(5, pal), 5);
+  text(g, 'at least one pod here is in trouble; it blinks for the worst', x + 150, ty, pal.dim, 5);
+  ty += 11;
+  text(g, `CLICK a ${(skin.vocab.pod || 'POD').toLowerCase()} for its detail, or a `
+        + `${(skin.vocab.node || 'NODE').toLowerCase()} for capacity and what is wrong on it.`,
+       x + 14, ty, pal.dim, 5);
 
   const box = closeBox(panel);
   drawCloseBox(g, ctx, box);

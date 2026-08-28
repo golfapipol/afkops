@@ -1,6 +1,6 @@
 'use strict';
 const { createTransitions } = require('./transitions.js');
-const { buildWorld, buildPodDetail } = require('./world.js');
+const { buildWorld, buildPodDetail, buildNodeDetail } = require('./world.js');
 
 // A synthetic cluster that deliberately drives every lifecycle transition on a
 // loop, so all three skins and the whole animation path can be verified with no
@@ -285,7 +285,12 @@ function createDemoCollector({ config, onTransition, onLinkChange }) {
     return pod ? buildPodDetail(pod, podMetrics, []) : null;
   }
 
-  return { start, stop, snapshot, podDetail, isPriming: () => priming,
+  function nodeDetail(name) {
+    const node = nodes.get(name);
+    return node ? buildNodeDetail(node, nodeMetrics, pods, [], config) : null;
+  }
+
+  return { start, stop, snapshot, podDetail, nodeDetail, isPriming: () => priming,
            stats: () => ({ nodes: nodes.size, pods: pods.size, tracked: transitions.size() }) };
 }
 

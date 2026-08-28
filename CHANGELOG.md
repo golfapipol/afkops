@@ -15,6 +15,12 @@ Notable changes to [afkops](https://www.npmjs.com/package/afkops).
   since that is how you look at a tank.
 - Views now understand that some skins' units swim rather than stand, declared by
   the skin as `side.swims`.
+- **Click a node** — its header band, or any empty part of it — for capacity,
+  allocatable, requests, limits and live usage, its conditions and taints, and
+  the problems on that node. `GET /api/node?name=…` backs it.
+- The **badge on a plot** is now explained in both legends. It marks a node with
+  at least one pod needing attention, tinted by the worst severity there and
+  blinking for the worst tiers; it had no explanation anywhere before.
 
 ### Fixed
 

@@ -7,6 +7,7 @@ import { drawHud, drawRibbon, problemRows } from './hud.js';
 import { drawFullLegend } from './legend.js';
 import { buttons, drawButtons, hitTest, closeBox } from './ui.js';
 import { pickUnit, drawPodPanel, drawSelection } from './podinfo.js';
+import { pickNode, drawNodePanel, drawNodeSelection } from './nodeinfo.js';
 import { rank, rankGroups, byNode, levelColor, PROBLEM_LEVEL } from './triage.js';
 import { clockHours, phaseBlend, blendPalette } from './daynight.js';
 import * as topdown from './views/topdown.js';
@@ -48,7 +49,32 @@ let podDetail = null;
 let podPanel = null;
 let podFetchSeq = 0;
 
+// Node selection, the same shape as pod selection.
+let selectedNode = null;
+let nodeDetail = null;
+let nodePanel = null;
+let nodeFetchSeq = 0;
+
+function selectNode(name) {
+  clearSelection();
+  selectedNode = name;
+  nodeDetail = { loading: true };
+  const seq = ++nodeFetchSeq;
+  fetch(`/api/node?name=${encodeURIComponent(name)}`)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('gone'))))
+    .then((d) => { if (seq === nodeFetchSeq) { nodeDetail = d; renderNow(); } })
+    .catch(() => { if (seq === nodeFetchSeq) { nodeDetail = { error: true }; renderNow(); } });
+  renderNow();
+}
+
+function clearNodeSelection() {
+  selectedNode = null; nodeDetail = null; nodePanel = null;
+  nodeFetchSeq++;
+  renderNow();
+}
+
 function selectPod(u) {
+  if (nodeDetail) { selectedNode = null; nodeDetail = null; nodePanel = null; nodeFetchSeq++; }
   selectedUid = u.pod.uid;
   podDetail = { loading: true };
   const seq = ++podFetchSeq;
@@ -341,11 +367,25 @@ window.addEventListener('keydown', (e) => {
   else if (k === '=' || k === '+') { cam.zoomIn(); renderNow(); }
   else if (k === '-' || k === '_') { cam.zoomOut(); renderNow(); }
   else if (k === 'r') location.reload();
-  else if (e.key === 'Escape') { if (podDetail) clearSelection(); else legendOpen = false; }
+  else if (e.key === 'Escape') {
+    if (nodeDetail) clearNodeSelection();
+    else if (podDetail) clearSelection();
+    else legendOpen = false;
+  }
   else if (e.key === 'Tab') { e.preventDefault(); cycleSkin(); }
 });
 canvas.addEventListener('click', (e) => {
   const p = engine.toDesign(e.clientX, e.clientY);
+
+  // The node panel owns clicks while it is open.
+  if (nodeDetail && nodePanel) {
+    const cb = closeBox(nodePanel);
+    if (p.x >= cb.x && p.x <= cb.x + cb.w && p.y >= cb.y && p.y <= cb.y + cb.h) { clearNodeSelection(); return; }
+    const inPanel = p.x >= nodePanel.x && p.x <= nodePanel.x + nodePanel.w
+                 && p.y >= nodePanel.y && p.y <= nodePanel.y + nodePanel.h;
+    if (!inPanel) clearNodeSelection();
+    return;
+  }
 
   // The pod panel owns clicks while it is open.
   if (podDetail && podPanel) {
@@ -386,11 +426,17 @@ canvas.addEventListener('click', (e) => {
     case 'tier': cycleTier(); break;
     case 'help': legendOpen = true; legendOpenedAt = performance.now(); break;
     default: {
-      // Not a control: try to pick a pod out of the scene, in world space.
+      // Not a control. In the scene, the header band of a plot always means
+      // the node — that is where the badge lives — and elsewhere a pod wins if
+      // one was hit, otherwise the node it was standing on.
       if (p.x < SCENE.x || p.x > SCENE.x + SCENE.w || p.y < SCENE.y || p.y > SCENE.y + SCENE.h) break;
       const wp = cam.toWorld(p.x, p.y);
+      const header = pickNode(model.layout, wp.x, wp.y, true);
+      if (header) { selectNode(header.name); break; }
       const u = pickUnit(model.units, wp.x, wp.y);
-      if (u) selectPod(u);
+      if (u) { selectPod(u); break; }
+      const inside = pickNode(model.layout, wp.x, wp.y, false);
+      if (inside) selectNode(inside.name);
       break;
     }
   }
@@ -541,6 +587,10 @@ function drawScene(now, dt) {
       const sel = model.units.get(selectedUid);
       if (sel) drawSelection(g, ctx, sel);
     }
+    if (selectedNode) {
+      const l = model.layout.find((x) => x.node.name === selectedNode);
+      if (l) drawNodeSelection(g, ctx, l);
+    }
 
     drawOverflow(g, ctx);
     drawNodeBadges(g, ctx);
@@ -562,6 +612,7 @@ function drawScene(now, dt) {
     if (legendOpen && now - legendOpenedAt > LEGEND_AUTOCLOSE_MS) legendOpen = false;
     legendPanel = legendOpen ? drawFullLegend(g, ctx, skin, view) : null;
     podPanel = podDetail ? drawPodPanel(g, ctx, podDetail, skin) : null;
+    nodePanel = nodeDetail ? drawNodePanel(g, ctx, nodeDetail, world, skin) : null;
   } else {
     const s = 'CONNECTING…';
     text(g, s, (W - textW(g, s, 8)) / 2, H / 2, '#7f849c', 8);

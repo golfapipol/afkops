@@ -331,6 +331,70 @@ function buildPodDetail(pod, podMetrics, recentEvents) {
   };
 }
 
+// ---- node detail ----------------------------------------------------------
+// Everything behind the badge on a plot: what the node is, what is promised to
+// it, what it is really doing, and which of its pods are unhappy.
+function buildNodeDetail(node, nodeMetrics, pods, recentEvents, config) {
+  const m = node.metadata || {};
+  const status = node.status || {};
+  const alloc = status.allocatable || {};
+  const cap = status.capacity || {};
+  const name = m.name;
+
+  let cpuReq = 0, cpuLim = 0, memReq = 0, memLim = 0, count = 0;
+  const residents = [];
+  for (const pod of pods.values()) {
+    if ((pod.spec && pod.spec.nodeName) !== name) continue;
+    const holds = podHoldsResources(pod);
+    if (holds) {
+      const r = podResources(pod, 'requests'), l = podResources(pod, 'limits');
+      cpuReq += r.cpu; memReq += r.mem; cpuLim += l.cpu; memLim += l.mem;
+      count++;
+    }
+    residents.push({
+      uid: pod.metadata.uid, name: pod.metadata.name, ns: pod.metadata.namespace,
+      phase: podPhaseOf(pod), ready: isReady(pod),
+      restarts: (((pod.status || {}).containerStatuses) || [])
+        .reduce((a, c) => a + (c.restartCount || 0), 0),
+      cpuReq: podResources(pod, 'requests').cpu,
+      age: Date.parse(pod.metadata.creationTimestamp || "") || 0,
+    });
+  }
+
+  const use = (nodeMetrics && nodeMetrics.get(name)) || null;
+  const events = (recentEvents || [])
+    .filter((e) => e.kind === 'Node' && e.name === name).slice(-6).reverse();
+
+  const labels = m.labels || {};
+  return {
+    name,
+    // No display-name shortening here: that is only meaningful across the whole
+    // node set, and when you are inspecting one node you want its real name.
+    ready: (status.conditions || []).some((c) => c.type === 'Ready' && c.status === 'True'),
+    unschedulable: !!(node.spec && node.spec.unschedulable),
+    created: Date.parse(m.creationTimestamp || '') || 0,
+    kubelet: status.nodeInfo && status.nodeInfo.kubeletVersion,
+    os: status.nodeInfo && status.nodeInfo.osImage,
+    instance: labels['node.kubernetes.io/instance-type'] || labels['beta.kubernetes.io/instance-type'] || '',
+    zone: labels['topology.kubernetes.io/zone'] || labels['failure-domain.beta.kubernetes.io/zone'] || '',
+    roles: nodeRoles(node),
+    // Conditions other than a healthy Ready are the actionable ones.
+    conditions: (status.conditions || [])
+      .filter((c) => (c.type === 'Ready' && c.status !== 'True') || (c.type !== 'Ready' && c.status === 'True'))
+      .map((c) => ({ type: c.type, status: c.status, reason: c.reason || '',
+                     message: String(c.message || '').slice(0, 160) })),
+    taints: ((node.spec && node.spec.taints) || [])
+      .map((t) => ({ key: t.key, value: t.value || '', effect: t.effect })),
+    cpu: { capacity: parseCpu(cap.cpu), allocatable: parseCpu(alloc.cpu),
+           requests: cpuReq, limits: cpuLim, usage: use ? use.cpu : null },
+    mem: { capacity: parseMem(cap.memory), allocatable: parseMem(alloc.memory),
+           requests: memReq, limits: memLim, usage: use ? use.mem : null },
+    pods: { count, max: parseCpu(alloc.pods) || 110, total: residents.length },
+    residents,
+    events,
+  };
+}
+
 // `kubectl top` output -> maps. Tolerates the header line and missing columns.
 function parseTopNodes(text) {
   const out = new Map();
@@ -354,4 +418,4 @@ function parseTopPods(text) {
   return out;
 }
 
-module.exports = { buildWorld, parseTopNodes, parseTopPods, buildPodDetail, qosClass };
+module.exports = { buildWorld, parseTopNodes, parseTopPods, buildPodDetail, buildNodeDetail, qosClass };

@@ -75,6 +75,7 @@ All screenshots are of the **synthetic demo cluster** — see
 | `N` / `Shift+N` | jump to the next / previous problem |
 | `L` | full legend overlay |
 | click a pod | inspect it |
+| click a plot | inspect the node |
 | `Esc` | close a panel |
 | `Tab` or click | cycle skin |
 | `R` | reload |
@@ -223,6 +224,21 @@ Three things then make it findable:
   opens its detail. Spotting and diagnosing is one keypress. Stepping walks
   *groups*, so it does not march you through six replicas of the same fault.
 
+## Clicking a node
+
+Every plot carries a small **badge in its corner** when a node has at least one
+pod needing attention — tinted by the worst severity there, blinking for the
+worst tiers. Click the plot's header band, or any empty part of it, for what is
+behind the badge:
+
+- **capacity, allocatable, requests, limits and live usage** on one bar each.
+  The gap between capacity and allocatable is what the kubelet, the container
+  runtime and the eviction threshold hold back — real machine you cannot schedule
+  onto, and something most dashboards never show you.
+- pod count against the node's ceiling
+- conditions and taints, when there are any
+- the ranked problems on that node
+
 ## Clicking a pod
 
 Click any creature to inspect the pod it stands for. Because sprites can be four
@@ -336,8 +352,8 @@ event log, sprite pool, and a transition map reconciled against live pods on
 every snapshot. Measured flat at ~50-55 MB RSS under 13× normal cluster churn.
 
 `GET /api/health` reports RSS, client count and collector state if you want to
-watch it from outside. `GET /api/pod?uid=…` returns the full detail for one pod,
-which is what the inspect panel reads.
+watch it from outside. `GET /api/pod?uid=…` and `GET /api/node?name=…` return the
+full detail behind the two inspect panels.
 
 A bounded ring of the last 800 cluster events is kept in memory purely so a pod's
 own events can be shown on click; the transitions layer only keeps the few

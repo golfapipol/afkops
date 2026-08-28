@@ -172,6 +172,13 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(detail || { error: 'pod not found' }));
     return;
   }
+  if (p === '/api/node') {
+    const nm = url.searchParams.get('name') || '';
+    const detail = collector.nodeDetail ? collector.nodeDetail(nm) : null;
+    res.writeHead(detail ? 200 : 404, { 'content-type': 'application/json', 'cache-control': 'no-cache' });
+    res.end(JSON.stringify(detail || { error: 'node not found' }));
+    return;
+  }
   if (p === '/api/history') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-cache' });
     res.end(JSON.stringify(seriesPayload()));

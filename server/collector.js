@@ -1,7 +1,7 @@
 'use strict';
 const { kubectlJson, kubectlText, createWatch, currentContext } = require('./kubectl.js');
 const { createTransitions } = require('./transitions.js');
-const { buildWorld, parseTopNodes, parseTopPods, buildPodDetail } = require('./world.js');
+const { buildWorld, parseTopNodes, parseTopPods, buildPodDetail, buildNodeDetail } = require('./world.js');
 
 // Owns the live picture of the cluster: watch streams keep the object maps
 // current, a periodic resync heals anything a dropped watch missed, and
@@ -180,7 +180,12 @@ function createCollector({ config, onTransition, onLinkChange }) {
     return buildPodDetail(pod, podMetrics, recentEvents);
   }
 
-  return { start, stop, snapshot, podDetail, isPriming: () => priming,
+  function nodeDetail(name) {
+    const node = nodes.get(name);
+    return node ? buildNodeDetail(node, nodeMetrics, pods, recentEvents, config) : null;
+  }
+
+  return { start, stop, snapshot, podDetail, nodeDetail, isPriming: () => priming,
            stats: () => ({ nodes: nodes.size, pods: pods.size, tracked: transitions.size(),
                            events: recentEvents.length }) };
 }
