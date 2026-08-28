@@ -2,6 +2,17 @@
 
 Notable changes to [afkops](https://www.npmjs.com/package/afkops).
 
+## Unreleased
+
+### Added
+
+- Nodes **arrive and leave visibly**. A removed node used to vanish between two
+  frames while every other plot snapped sideways as the packing closed the gap,
+  which reads as a glitch rather than as a node leaving the cluster. Its plot now
+  holds its place for two seconds, darkens, sinks and is labelled `REMOVED`
+  before the layout closes up. New nodes rise into place and are labelled `NEW`.
+  A node that comes back mid-departure (a flapping kubelet) cancels its own exit.
+
 ## 0.2.0
 
 ### Added

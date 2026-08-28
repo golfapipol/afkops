@@ -28,8 +28,20 @@ export function createWorldModel() {
   const plots = new Map();     // node -> animation state
   let state = null;
   let layout = [];
+  const arrivals = new Map();   // name -> when the entrance finishes
+  const seenNodes = new Set();  // so a node is "new" only the first time
   let layoutKey = '';
   let worldSize = { w: SCENE.w, h: SCENE.h };
+
+  // Nodes that have gone are kept in the layout for a moment so the plot can
+  // drain in place. Dropping them immediately makes a node vanish mid-frame and
+  // snaps every other plot sideways as the packing closes the gap — which reads
+  // as a glitch rather than as a node leaving the cluster.
+  const ARRIVE_MS = 900;
+  const LEAVE_MS = 2000;
+  // Exposed so the renderer can turn a deadline back into a 0..1 fraction.
+  const durations = { arrive: ARRIVE_MS, leave: LEAVE_MS };
+  const ghosts = new Map();     // name -> { node, until }
 
   // Stable slot assignment: a pod keeps its position for its whole life, so the
   // scene does not reshuffle every update.
@@ -46,10 +58,34 @@ export function createWorldModel() {
     state = next;
     const dense = next.pods.length;
 
+    // ---- nodes arriving and leaving -------------------------------------
+    const live = new Set(next.nodes.map((n) => n.name));
+    for (const l of layout) {
+      const nm = l.node.name;
+      if (!live.has(nm) && !ghosts.has(nm)) ghosts.set(nm, { node: l.node, until: now + LEAVE_MS });
+    }
+    for (const [nm, gh] of ghosts) {
+      // A node that comes back (a flapping kubelet) cancels its own departure.
+      if (live.has(nm) || now > gh.until) ghosts.delete(nm);
+    }
+    for (const n of next.nodes) {
+      if (!arrivals.has(n.name) && !seenNodes.has(n.name)) arrivals.set(n.name, now + ARRIVE_MS);
+      seenNodes.add(n.name);
+    }
+    for (const [nm, until] of arrivals) if (now > until || !live.has(nm)) arrivals.delete(nm);
+    for (const nm of seenNodes) if (!live.has(nm) && !ghosts.has(nm)) seenNodes.delete(nm);
+
+    // Ghosts stay in the layout, in their sorted place, so nothing reflows until
+    // they are actually gone.
+    const nodesForLayout = ghosts.size
+      ? [...next.nodes, ...[...ghosts.values()].map((gh) => gh.node)]
+          .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+      : next.nodes;
+
     // Recompute layout when the node set or the view changes; otherwise reuse
     // it so positions stay put between frames.
     const key = view.id + '|' + q.id + '|' + (opts && opts.swims ? 'swim' : 'stand')
-              + '|' + next.nodes.map((n) => n.name).join(',');
+              + '|' + nodesForLayout.map((n) => n.name).join(',');
     // A view or tier change is a different camera, not motion: sprites should
     // appear in the new arrangement rather than gliding across the screen from
     // wherever they stood in the old one.
@@ -57,18 +93,25 @@ export function createWorldModel() {
     if (relayout) {
       // Views now return { items, world }: the scene can be bigger than the
       // viewport, and the camera needs to know how big.
-      const built = view.computeLayout(next.nodes, SCENE);
+      const built = view.computeLayout(nodesForLayout, SCENE);
       layout = built.items;
       worldSize = built.world;
       layoutKey = key;
     } else {
-      for (let i = 0; i < layout.length; i++) if (next.nodes[i]) layout[i].node = next.nodes[i];
+      for (let i = 0; i < layout.length; i++) if (nodesForLayout[i]) layout[i].node = nodesForLayout[i];
     }
 
     const byName = new Map(layout.map((l) => [l.node.name, l]));
 
     // Recomputed each update: pod counts change, and sprite size follows them.
     for (const l of layout) {
+      // Deadlines, not progress: update() only runs when a state frame arrives
+      // (every couple of seconds), so a precomputed fraction would step in
+      // jerks. The renderer derives the fraction from the current frame time.
+      const gh = ghosts.get(l.node.name);
+      const arriving = arrivals.get(l.node.name);
+      l.leaveUntil = gh ? gh.until : 0;
+      l.arriveUntil = arriving || 0;
       l.metrics = view.spriteMetrics ? view.spriteMetrics(l.rect, l.node, q, opts) : { size: q.unitSize, cols: 6, rows: 4, detailed: true };
       if (!plots.has(l.node.name)) plots.set(l.node.name, { born: now, seed: hash(l.node.name), fx: null });
     }
@@ -184,8 +227,11 @@ export function createWorldModel() {
   }
   // Layout must be rebuilt when the view or tier changes.
   function invalidate() { layoutKey = ''; }
+  // True while any plot is mid-entrance or mid-exit, so the caller can keep
+  // repainting even when nothing else changed.
+  function settling() { return ghosts.size > 0 || arrivals.size > 0; }
 
-  return { update, animate, units, plots, markFx, markPlotFx, invalidate,
+  return { update, animate, units, plots, markFx, markPlotFx, invalidate, settling, durations,
            get layout() { return layout; }, get world() { return worldSize; },
            get state() { return state; },
            MAX_UNITS_PER_NODE };

@@ -1,5 +1,5 @@
 'use strict';
-import { createEngine, W, H, px, rect, text, textW, rgba } from './engine.js';
+import { createEngine, W, H, px, rect, text, textW, dither, rgba } from './engine.js';
 import { TIERS, TIER_ORDER } from './quality.js';
 import { createWorldModel, SCENE, HUD } from './world.js';
 import { createCamera } from './camera.js';
@@ -512,6 +512,7 @@ let lastRaw = performance.now();
 const q = { u: 1 };
 const ctx = { pal: null, q, t: 0, hours: 0, skin: null, view: null, W, H };
 const drawList = [];
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 // Frame timing, so density can be verified rather than assumed.
 let fps = 0, frameCount = 0, fpsSince = 0, rawDt = 0, worstDt = 0;
@@ -574,8 +575,16 @@ function drawScene(now, dt) {
     g.scale(cam.zoom, cam.zoom);
 
     for (const l of model.layout) {
-      if (view.drawContainer) view.drawContainer(g, l.node, l.rect, ctx);
-      else skin.drawContainer(g, l.node, l.rect, ctx);
+      const draw = () => {
+        if (view.drawContainer) view.drawContainer(g, l.node, l.rect, ctx);
+        else skin.drawContainer(g, l.node, l.rect, ctx);
+      };
+      // Fractions are derived here, per frame, from the deadlines the model set.
+      const D = model.durations;
+      l.leaving = l.leaveUntil ? clamp01(1 - (l.leaveUntil - now) / D.leave) : 0;
+      l.arriving = l.arriveUntil ? clamp01(1 - (l.arriveUntil - now) / D.arrive) : 0;
+      if (l.leaving > 0 || l.arriving > 0) drawTransitioningPlot(g, ctx, l, draw);
+      else draw();
     }
     // Back rank first, so the front rank overlaps it correctly in side view.
     drawList.length = 0;
@@ -662,6 +671,21 @@ window.__k8sfarmSelect = (uid) => {
 
 // Advances the animation by a simulated span, so roaming can be verified in a
 // backgrounded tab where requestAnimationFrame is throttled to nothing.
+// Renders one frame on demand and reports what the plot transitions look like.
+// The render-derived fractions only advance when frames run, and a backgrounded
+// tab gets almost none.
+window.__k8sfarmTransitions = () => {
+  renderNow();
+  const d = window.__k8sfarmDebug();
+  return {
+    now: Math.round(performance.now()),
+    settling: model.settling(),
+    plots: d.layout
+      .filter((l) => l.leaveUntil || l.arriveUntil)
+      .map((l) => ({ n: l.name.slice(-14), leaving: l.leaving, arriving: l.arriving })),
+  };
+};
+
 window.__k8sfarmFit = () => {
   cam.setWorld(model.world.w, model.world.h);
   cam.fit();
@@ -697,6 +721,7 @@ function drawNodeBadges(g, ctx) {
   }
   const z = cam.zoom;
   for (const l of model.layout) {
+    if (l.leaving > 0) continue;
     const info = badgeCache.map.get(l.node.name);
     if (!info || info.worst < PROBLEM_LEVEL) continue;
     const col = levelColor(info.worst, pal);
@@ -709,6 +734,64 @@ function drawNodeBadges(g, ctx) {
     px(g, bx, by, r * 1.4, r * 1.4, col);
     px(g, bx + r * 0.35, by + r * 0.35, r * 0.7, r * 0.7, '#000000aa');
   }
+}
+
+// A node arriving or leaving. Drawn generically rather than per skin: what it
+// has to convey is the same everywhere, and every skin would otherwise need its
+// own version of the same idea.
+//
+// Leaving is deliberately slower than arriving, and the plot sinks as it fades
+// so it reads as being decommissioned rather than as a rendering glitch. Pods
+// have already poofed by then, so the sequence is: residents leave, then the
+// plot goes.
+function drawTransitioningPlot(g, ctx, l, draw) {
+  const { pal, q, t } = ctx;
+  const r = l.rect;
+
+  if (l.arriving > 0) {
+    // Ease-out: quick to appear, settling into place.
+    const k = 1 - Math.pow(1 - l.arriving, 3);
+    g.save();
+    g.globalAlpha = k;
+    g.translate(0, (1 - k) * 10);
+    draw();
+    g.restore();
+    if (k < 0.9) {
+      const w = textW(g, 'NEW', 5) + 4;
+      px(g, r.x + r.w / 2 - w / 2, r.y - 8, w, 7, pal.good);
+      text(g, 'NEW', r.x + r.w / 2 - w / 2 + 2, r.y - 7, '#ffffff', 5);
+    }
+    return;
+  }
+
+  // Leaving. Fading alone does not work: on the farm skin a green plot fades
+  // into green grass and simply evaporates, which reads as a glitch. Going dark
+  // reads as "shutting down" against any background, so the plot is darkened
+  // and outlined first, and only actually fades at the very end.
+  const p = l.leaving;
+  const sink = p * p * 16;
+  g.save();
+  g.translate(0, sink);
+  draw();
+
+  // The lights going out, top-down, like a machine powering off.
+  const dark = Math.min(0.82, p * 1.1);
+  g.fillStyle = `rgba(4,6,10,${dark.toFixed(3)})`;
+  g.fillRect(r.x, r.y, r.w, r.h);
+  if (q.hi) dither(g, r.x, r.y, r.w, r.h, 'rgba(0,0,0,0.5)', 3, q.u);
+
+  // A frame that stays legible the whole way down.
+  rect(g, r.x, r.y, r.w, r.h, pal.bad, q.hi ? 1 : 1);
+  g.restore();
+
+  const label = 'REMOVED';
+  const w = textW(g, label, 6) + 6;
+  const y = r.y + r.h / 2 - 5 + sink;
+  g.save();
+  g.globalAlpha = p > 0.8 ? Math.max(0, (1 - p) / 0.2) : 1;
+  px(g, r.x + r.w / 2 - w / 2, y, w, 10, pal.bad);
+  text(g, label, r.x + r.w / 2 - w / 2 + 3, y + 2, '#ffffff', 6);
+  g.restore();
 }
 
 // Tells you there is more world than viewport, and where you are looking. A
@@ -767,6 +850,7 @@ function drawOverflow(g, ctx) {
     if (u.pod && u.pod.node) shown.set(u.pod.node, (shown.get(u.pod.node) || 0) + 1);
   }
   for (const l of model.layout) {
+    if (l.leaving > 0) continue;      // its residents are already gone
     const extra = l.node.pods.count - (shown.get(l.node.name) || 0);
     if (extra <= 0) continue;
     const s = `+${extra}`;
@@ -784,6 +868,8 @@ window.__k8sfarmDebug = () => ({
          world: { w: Math.round(cam.world.w), h: Math.round(cam.world.h) }, canScroll: cam.canScroll() },
   layout: model.layout.map((l) => ({ name: l.node.name, rect: l.rect, pods: l.node.pods.count,
                                      spriteSize: l.metrics && +l.metrics.size.toFixed(2),
+                                     leaving: +(l.leaving || 0).toFixed(2), arriving: +(l.arriving || 0).toFixed(2),
+                                     leaveUntil: l.leaveUntil || 0, arriveUntil: l.arriveUntil || 0,
                                      cols: l.metrics && l.metrics.cols, rows: l.metrics && l.metrics.rows,
                                      rh: +l.rect.h.toFixed(1), rw: +l.rect.w.toFixed(1) })),
   units: [...model.units.entries()].map(([uid, u]) => ({
