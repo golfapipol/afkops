@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The package claims Node >= 18, so prove it on the oldest supported
+        # version as well as current. This is exactly where a syntax or module
+        # difference would show up.
+        node: ['18', '20', '22', 'lts/*']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # No dependencies to install: `npm ci` would fail without a lockfile, and
+      # there is nothing for it to do.
+      - run: node --test
